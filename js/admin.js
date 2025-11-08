@@ -98,6 +98,19 @@ class AdminDashboard {
         }
     }
 
+    // Refresh sales data from API
+    async refreshSales() {
+        try {
+            const sales = await api.getSales();
+            this.sales = DataNormalizer.normalize(sales, 'sales');
+            // Update localStorage backup
+            this.saveData(STORAGE_KEYS.sales, this.sales);
+        } catch (error) {
+            console.error('Error refreshing sales:', error);
+            // Keep existing sales data on error
+        }
+    }
+
     // Fallback: Load from localStorage
     loadDataFromLocalStorage() {
         try {
@@ -499,7 +512,10 @@ class AdminDashboard {
             'dashboard': () => this.updateDashboard(),
             'products': () => this.renderProducts(),
             'inventory': () => this.renderInventory(),
-            'sales': () => this.renderSales(),
+            'sales': async () => {
+                await this.refreshSales();
+                this.renderSales();
+            },
             'expenses': () => this.renderExpenses(),
             'purchase-orders': () => this.renderPurchaseOrders(),
             'reports': () => this.renderReports(),

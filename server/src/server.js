@@ -174,14 +174,19 @@ app.get('/api/sales', (req, res) => {
   const params = [];
   
   if (startDate && endDate) {
+    // If dates are date-only (YYYY-MM-DD), include the full day
+    const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
+    const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
     query = 'SELECT * FROM sales WHERE date >= ? AND date <= ? ORDER BY date DESC';
-    params.push(startDate, endDate);
+    params.push(start, end);
   } else if (startDate) {
+    const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
     query = 'SELECT * FROM sales WHERE date >= ? ORDER BY date DESC';
-    params.push(startDate);
+    params.push(start);
   } else if (endDate) {
+    const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
     query = 'SELECT * FROM sales WHERE date <= ? ORDER BY date DESC';
-    params.push(endDate);
+    params.push(end);
   }
   
   const sales = params.length > 0 
