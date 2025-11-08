@@ -184,10 +184,18 @@ app.get('/api/sales', (req, res) => {
     params.push(endDate);
   }
   
-  const rows = params.length > 0 
+  const sales = params.length > 0 
     ? db.prepare(query).all(...params)
     : db.prepare(query).all();
-  ok(res, rows);
+  
+  // Include items and discounts for each sale
+  const salesWithDetails = sales.map(sale => {
+    const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(sale.id);
+    const discounts = db.prepare('SELECT * FROM discounts WHERE sale_id = ?').all(sale.id);
+    return { ...sale, items, discounts };
+  });
+  
+  ok(res, salesWithDetails);
 });
 
 app.get('/api/sales/:id', (req, res) => {
