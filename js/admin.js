@@ -590,9 +590,9 @@ class AdminDashboard {
         let filtered = this.filterByPeriod(this.deliveries, 'date', period);
 
         filtered = filtered.filter(d =>
-            d.description.toLowerCase().includes(search) ||
-            d.driver.toLowerCase().includes(search) ||
-            d.remarks.toLowerCase().includes(search)
+            (d.description || '').toLowerCase().includes(search) ||
+            (d.driver || '').toLowerCase().includes(search) ||
+            (d.remarks || '').toLowerCase().includes(search)
         );
 
         if (!filtered.length) {
@@ -875,6 +875,10 @@ class AdminDashboard {
                 item.beginning = beginning;
                 item.stock = stock;
                 item.updatedAt = nowIso;
+                // Ensure productName is set
+                if (product && !item.productName) {
+                    item.productName = product.name;
+                }
             } else {
                 this.inventory.push({
                     id: result.id || Utils.generateId(),
@@ -995,7 +999,7 @@ class AdminDashboard {
         const filter = document.getElementById('inventory-filter')?.value || 'all';
         
         let filtered = this.inventory.filter(i =>
-            i.productName.toLowerCase().includes(search)
+            (i.productName || '').toLowerCase().includes(search)
         );
         
         if (filter !== 'all') {
@@ -1064,7 +1068,7 @@ class AdminDashboard {
         
         let filtered = this.filterByPeriod(this.sales, 'date', period);
         filtered = filtered.filter(s =>
-            s.productName.toLowerCase().includes(search)
+            (s.productName || '').toLowerCase().includes(search)
         );
         
         if (paymentMethod !== 'all') {
@@ -1200,9 +1204,9 @@ class AdminDashboard {
         }
         
         filtered = filtered.filter(e =>
-            e.description.toLowerCase().includes(search) ||
-            e.category.toLowerCase().includes(search) ||
-            e.remarks.toLowerCase().includes(search)
+            (e.description || '').toLowerCase().includes(search) ||
+            (e.category || '').toLowerCase().includes(search) ||
+            (e.remarks || '').toLowerCase().includes(search)
         );
         
         if (!filtered.length) {
@@ -1369,9 +1373,9 @@ class AdminDashboard {
         const status = document.getElementById('po-status')?.value || 'all';
         
         let filtered = this.purchaseOrders.filter(po =>
-            po.poNumber.toLowerCase().includes(search) ||
-            po.supplier.toLowerCase().includes(search) ||
-            po.productName.toLowerCase().includes(search)
+            (po.poNumber || '').toLowerCase().includes(search) ||
+            (po.supplier || '').toLowerCase().includes(search) ||
+            (po.productName || '').toLowerCase().includes(search)
         );
         
         if (status !== 'all') {
