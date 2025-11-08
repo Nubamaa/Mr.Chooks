@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Chooks - Login</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="brand-section">
+                <img src="assets/Mr. Chooks.png" alt="Mr. Chooks Logo" class="brand-logo">
+                <h1 class="brand-title">Mr. Chooks</h1>
+                <p class="brand-subtitle">Complete Business Manager</p>
+            </div>
+            
+            <form id="login-form" class="login-form">
+                <div class="role-selection">
+                    <button type="button" class="btn btn-role active" data-role="admin"><i class="fas fa-user-shield"></i> Admin</button>
+                    <button type="button" class="btn btn-role" data-role="employee"><i class="fas fa-user"></i> Employee</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" placeholder="Enter username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" placeholder="Enter password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

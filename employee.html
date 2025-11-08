@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Chooks - Employee Kiosk</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/employee.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="kiosk-container">
+        <!-- Header -->
+        <header class="kiosk-header">
+            <div class="header-brand">
+                <img src="assets/Mr. Chooks.png" alt="Mr. Chooks Logo" class="brand-logo">
+                <div class="brand-info">
+                    <h1>Mr. Chooks</h1>
+                    <p>Employee Kiosk</p>
+                </div>
+            </div>
+            <div class="header-info">
+                <div class="current-time" id="current-time"></div>
+                <button class="btn btn-secondary btn-sm" id="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Kiosk Interface -->
+        <main class="kiosk-main">
+            <!-- Quick Sales Panel -->
+            <div class="sales-panel">
+                <h2 class="panel-title">Quick Sales</h2>
+                
+                <!-- Product Selection -->
+                <div class="product-selection">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="product-search" placeholder="Search products...">
+                    </div>
+                    
+                    <div class="products-grid" id="products-grid">
+                        <!-- Products will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Cart -->
+                <div class="cart-panel">
+                    <h3 class="cart-title">Current Sale</h3>
+                    <div class="cart-items" id="cart-items">
+                        <!-- Cart items will appear here -->
+                    </div>
+                    
+                    <div class="cart-summary">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span id="cart-subtotal">₱0.00</span>
+                        </div>
+                        
+                        <!-- Discount Section -->
+                        <div class="discount-section">
+                            <div class="summary-row">
+                                <span>Discount:</span>
+                                <div class="discount-controls">
+                                    <button class="btn btn-sm" id="apply-discount">Apply Discount</button>
+                                    <span id="discount-amount">₱0.00</span>
+                                </div>
+                            </div>
+                            <!-- Discount type badge will appear here -->
+                        </div>
+                        
+                        <div class="summary-row total">
+                            <span>Total:</span>
+                            <span id="cart-total">₱0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Payment Method -->
+                    <div class="payment-methods">
+                        <h4>Payment Method</h4>
+                        <div class="method-buttons">
+                            <button class="method-btn active" data-method="Cash">
+                                <i class="fas fa-money-bill"></i> Cash
+                            </button>
+                            <button class="method-btn" data-method="GCash">
+                                <i class="fas fa-mobile-alt"></i> GCash
+                            </button>
+                        </div>
+                        <div class="gcash-reference" id="gcash-reference" style="display: none;">
+                            <label>GCash Reference ID:</label>
+                            <input type="text" id="gcash-ref-id" placeholder="Enter reference ID">
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" id="clear-cart">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                        <button class="btn btn-success" id="complete-sale">
+                            <i class="fas fa-check"></i> Complete Sale
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Sales & Unsold Products -->
+            <div class="recent-sales">
+                <h2 class="panel-title">Today's Activity</h2>
+                <div class="activity-tabs">
+                    <button class="tab-btn active" data-tab="sales">Sales</button>
+                    <button class="tab-btn" data-tab="unsold">Unsold Products</button>
+                </div>
+                
+                <div class="tab-content active" id="sales-tab">
+                    <div class="sales-list" id="sales-list">
+                        <!-- Recent sales will appear here -->
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="unsold-tab">
+                    <div class="unsold-products" id="unsold-products">
+                        <!-- Unsold products will appear here -->
+                    </div>
+                    <button class="btn btn-primary btn-block" id="record-unsold">
+                        <i class="fas fa-exclamation-triangle"></i> Record Unsold Products
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Discount Modal -->
+    <div class="modal" id="discount-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Apply ₱20 Discount</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="discount-buttons">
+                    <button class="discount-option-btn" data-type="whole_chicken">
+                        <i class="fas fa-drumstick-bite"></i>
+                        <span>Whole Chicken</span>
+                        <small>No ID Required</small>
+                    </button>
+                    <button class="discount-option-btn" data-type="pwd">
+                        <i class="fas fa-wheelchair"></i>
+                        <span>PWD</span>
+                        <small>ID Required</small>
+                    </button>
+                    <button class="discount-option-btn" data-type="senior">
+                        <i class="fas fa-user-friends"></i>
+                        <span>Senior Citizen</span>
+                        <small>ID Required</small>
+                    </button>
+                </div>
+                <div class="form-group" id="discount-id-field" style="display: none;">
+                    <input type="text" class="form-control" id="discount-id" placeholder="Enter ID number">
+                    <small class="form-text" id="id-usage-info" style="display: none;"></small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-discount">Cancel</button>
+                <button class="btn btn-primary" id="apply-discount-btn" disabled>Apply ₱20 Discount</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unsold Products Modal -->
+    <div class="modal" id="unsold-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Record Unsold Products</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select Product</label>
+                    <select class="form-control" id="unsold-product">
+                        <option value="">Select Product</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" class="form-control" id="unsold-quantity" placeholder="0" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Selling Price (₱)</label>
+                    <input type="number" class="form-control" id="unsold-price" placeholder="0.00" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reason</label>
+                    <select class="form-control" id="unsold-reason">
+                        <option value="quality">Quality Issues</option>
+                        <option value="excess">Excess Inventory</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-unsold">Cancel</button>
+                <button class="btn btn-danger" id="save-unsold">Record Loss</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal" id="success-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Sale Completed!</h3>
+            </div>
+            <div class="modal-body">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <p>Sale recorded successfully.</p>
+                <div class="sale-summary" id="sale-summary">
+                    <!-- Sale summary will appear here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="new-sale-btn">New Sale</button>
+                <button class="btn btn-secondary" id="print-receipt">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/data-normalizer.js"></script>
+    <script src="js/employee.js"></script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+/* Admin Specific Styles */
+
+/* User Info in Header */
+.user-info {
+    padding: 8px 16px;
+    background: var(--primary-light);
+    border-radius: 6px;
+    border: 1px solid var(--primary-dark);
+    font-size: 14px;
+}
+
+/* Sales View - Read Only */
+#sales-view .btn-primary {
+    display: none; /* Hide "Record Sale" button */
+}
+
+#sales-table td {
+    cursor: default;
+}
+
+#sales-table .btn {
+    display: none; /* Hide action buttons in sales table */
+}
+
+/* Enhanced Tables */
+.table tbody tr:hover {
+    background: var(--bg);
+    cursor: default;
+}
+
+/* Modal Enhancements */
+.modal-content {
+    max-width: 500px;
+}
+
+/* Stats Cards Enhancement */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.stat-card:nth-child(1)::before { background: var(--primary-accent); }
+.stat-card:nth-child(2)::before { background: var(--secondary-accent); }
+.stat-card:nth-child(3)::before { background: var(--accent-orange); }
+.stat-card:nth-child(4)::before { background: var(--info-dark); }
+
+/* Navigation Enhancements */
+.nav-item#logout-nav {
+    background: var(--secondary-light);
+    border: 1px solid var(--secondary-dark);
+}
+
+.nav-item#logout-nav:hover {
+    background: var(--secondary);
+}
+
+/* Logout footer pinned to bottom */
+.logout-footer {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 1px solid var(--primary-dark);
+}
+
+/* Filter Bar Improvements */
+.filter-bar {
+    background: var(--white);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+}
+
+/* Empty State Enhancements */
+.empty {
+    padding: 60px 20px;
+    text-align: center;
+    background: var(--bg);
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: var(--text-light);
+    opacity: 0.6;
+}
+
+.empty-text {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 16px;
+}
+
+/* Product Grid Enhancements */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.product-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+    box-shadow: var(--shadow);
+}
+
+.product-card:hover {
+    border-color: var(--primary-accent);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+/* Low Stock Warning */
+.low-stock {
+    background-color: var(--danger) !important;
+}
+
+.low-stock:hover {
+    background-color: var(--danger-dark) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+    .section-body { padding: 16px; }
+}
+
+@media (max-width: 768px) {
+    .products-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-bar {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .filter-group {
+        width: 100%;
+    }
+    
+    .search-box {
+        min-width: 100%;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .sidebar, .header-actions, .filter-bar, .btn {
+        display: none !important;
+    }
+    
+    .main {
+        margin-left: 0 !important;
+    }
+    
+    .section {
+        break-inside: avoid;
+    }
+}
