@@ -146,20 +146,24 @@ The server provides RESTful API endpoints for all data operations:
 1. **Create a Render account** at [render.com](https://render.com)
 
 2. **Create a new Web Service**:
-   - Connect your GitHub repository
-   - Build Command: `cd server && npm install`
-   - Start Command: `cd server && npm start`
-   - Environment: `Node`
-   - Root Directory: Leave empty (or set to project root)
+   - Connect your GitHub repository: `https://github.com/Nubamaa/Mr.Chooks.git`
+   - **Root Directory**: `server` (IMPORTANT: Set this to `server`)
+   - **Environment**: `Node`
+   - **Build Command**: `npm install` (leave as default, or explicitly set this)
+   - **Start Command**: `npm start` (leave as default, or explicitly set this)
+   - **Plan**: Free (or choose a paid plan)
 
-3. **Set Environment Variables** (if needed):
-   - `PORT`: `3001` (or let Render assign automatically)
-   - `NODE_ENV`: `production`
+3. **Environment Variables** (Optional - can leave empty):
+   - No environment variables required
+   - Render automatically provides `PORT` environment variable
+   - Optional: `NODE_ENV` = `production` (not required)
 
 4. **Important for SQLite**:
    - Render provides persistent disk storage, so your SQLite database will persist
-   - The database file will be created automatically on first run
+   - The database file will be created automatically on first run in the `server` directory
    - Consider using a PostgreSQL database for production (requires schema migration)
+
+**Note**: The key setting is **Root Directory: `server`**. This tells Render that your `package.json` is in the `server` folder, not the root.
 
 ### Alternative: Vercel (Not Recommended)
 
