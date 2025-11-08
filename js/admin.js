@@ -875,8 +875,8 @@ class AdminDashboard {
                 item.beginning = beginning;
                 item.stock = stock;
                 item.updatedAt = nowIso;
-                // Ensure productName is set
-                if (product && !item.productName) {
+                // Always ensure productName is set when product exists
+                if (product) {
                     item.productName = product.name;
                 }
             } else {
@@ -1043,9 +1043,15 @@ class AdminDashboard {
                 stockText = 'Medium Stock';
             }
             
+            // Find product name if missing
+            const productName = i.productName || (() => {
+                const prod = this.products.find(p => p.id === i.productId || p.id === i.product_id);
+                return prod ? prod.name : 'Unknown Product';
+            })();
+            
             return `
                 <tr class="${rowClass}">
-                    <td><strong>${i.productName}</strong></td>
+                    <td><strong>${productName}</strong></td>
                     <td>${i.beginning}</td>
                     <td><strong>${i.stock}</strong></td>
                     <td><span class="badge ${stockStatus}">${stockText}</span></td>
