@@ -1,7 +1,16 @@
 // Centralized API Client
 class ApiClient {
     constructor() {
-        this.baseUrl = window.API_BASE_URL || 'http://localhost:3001';
+        // Use API_BASE_URL if set, otherwise detect from current location
+        // In production (Render), use current origin; in development, use localhost:3001
+        if (window.API_BASE_URL) {
+            this.baseUrl = window.API_BASE_URL;
+        } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            this.baseUrl = 'http://localhost:3001';
+        } else {
+            // Production: use current origin (e.g., https://mr-chooks.onrender.com)
+            this.baseUrl = window.location.origin;
+        }
         this.defaultHeaders = {
             'Content-Type': 'application/json'
         };
