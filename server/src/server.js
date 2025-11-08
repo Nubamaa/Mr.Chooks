@@ -372,7 +372,14 @@ app.put('/api/settings/:key', (req, res) => {
 app.use(express.static(staticPath));
 
 // Serve HTML pages
+// For security/usability serve the login page at root so visiting the site
+// doesn't immediately open the admin dashboard. The admin dashboard is
+// still available at /admin for authenticated users (client-side auth).
 app.get('/', (req, res) => {
+  res.sendFile(path.join(staticPath, 'login.html'));
+});
+
+app.get('/admin', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
