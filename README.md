@@ -149,6 +149,7 @@ The server provides RESTful API endpoints for all data operations:
    - Connect your GitHub repository: `https://github.com/Nubamaa/Mr.Chooks.git`
    - **Root Directory**: `server` (IMPORTANT: Set this to `server`)
    - **Environment**: `Node`
+   - **Node Version**: `20` (IMPORTANT: Render will use Node 20 from `.nvmrc` file, which is compatible with better-sqlite3)
    - **Build Command**: `npm install` (the postinstall script will automatically rebuild better-sqlite3 for Linux)
    - **Start Command**: `npm start` (leave as default, or explicitly set this)
    - **Plan**: Free (or choose a paid plan)
