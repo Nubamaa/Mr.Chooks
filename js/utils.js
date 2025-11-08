@@ -215,6 +215,19 @@ class ToastManager {
     }
     
     show(message, type = 'success', duration = 3000) {
+        // Remove all existing toasts to prevent piling up - only show one at a time
+        if (this.container) {
+            const existingToasts = this.container.querySelectorAll('.toast');
+            existingToasts.forEach(toast => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, 100);
+            });
+        }
+        
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         
