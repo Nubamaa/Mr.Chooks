@@ -18,17 +18,23 @@ class AdminDashboard {
     }
     
     async init() {
-        this.setupEventListeners();
-        this.setDefaultDates();
-        this.setDefaultPeriods();
-        this.initCalendarIntegration();
-        this.setupStorageSync();
-        this.updateUserDisplay();
-        
-        // Load data from API
-        await this.loadDataFromAPI();
-        this.renderAll();
-        this.hideLoading();
+        try {
+            this.setupEventListeners();
+            this.setDefaultDates();
+            this.setDefaultPeriods();
+            this.initCalendarIntegration();
+            this.setupStorageSync();
+            this.updateUserDisplay();
+            
+            // Load data from API (loadDataFromAPI handles its own loading state)
+            await this.loadDataFromAPI();
+            this.renderAll();
+        } catch (error) {
+            console.error('Error initializing admin dashboard:', error);
+            this.showToast('Error initializing dashboard. Please refresh the page.', 'error');
+            // Ensure loading is hidden even on error
+            this.hideLoading();
+        }
     }
     
     updateUserDisplay() {
@@ -95,6 +101,35 @@ class AdminDashboard {
             this.showToast('Failed to load data from server. Using cached data.', 'error');
             // Fallback to localStorage
             this.loadDataFromLocalStorage();
+        } finally {
+            // Always hide loading, even if there's an error
+            this.hideLoading();
+        }
+    }
+
+    // Refresh sales data from API
+    async refreshSales() {
+        try {
+            const sales = await api.getSales();
+            this.sales = DataNormalizer.normalize(sales, 'sales');
+            // Update localStorage backup
+            this.saveData(STORAGE_KEYS.sales, this.sales);
+        } catch (error) {
+            console.error('Error refreshing sales:', error);
+            // Keep existing sales data on error
+        }
+    }
+
+    // Refresh inventory data from API
+    async refreshInventory() {
+        try {
+            const inventory = await api.getInventory();
+            this.inventory = DataNormalizer.normalizeInventory(inventory, this.products);
+            // Update localStorage backup
+            this.saveData(STORAGE_KEYS.inventory, this.inventory);
+        } catch (error) {
+            console.error('Error refreshing inventory:', error);
+            // Keep existing inventory data on error
         }
     }
 
@@ -499,7 +534,16 @@ class AdminDashboard {
             'dashboard': () => this.updateDashboard(),
             'products': () => this.renderProducts(),
             'inventory': () => this.renderInventory(),
-            'sales': () => this.renderSales(),
+            'sales': async () => {
+                try {
+                    await this.refreshSales();
+                    this.renderSales();
+                } catch (error) {
+                    console.error('Error refreshing sales:', error);
+                    // Still render with existing data
+                    this.renderSales();
+                }
+            },
             'expenses': () => this.renderExpenses(),
             'purchase-orders': () => this.renderPurchaseOrders(),
             'reports': () => this.renderReports(),
@@ -508,7 +552,14 @@ class AdminDashboard {
         };
         
         if (viewHandlers[view]) {
-            viewHandlers[view]();
+            const handler = viewHandlers[view];
+            // Handle async handlers
+            const result = handler();
+            if (result instanceof Promise) {
+                result.catch(error => {
+                    console.error(`Error in view handler for ${view}:`, error);
+                });
+            }
         }
     }
 
@@ -865,34 +916,23 @@ class AdminDashboard {
         try {
             const result = await api.updateInventory(productId, { beginning, stock });
             
-            // Update local data (normalized format)
-            const existingIndex = this.inventory.findIndex(i => i.productId === productId);
-            const nowIso = new Date().toISOString();
-            const product = this.products.find(p => p.id === productId);
+            // Reload inventory from API to ensure we have fresh data with proper normalization
+            // This ensures productName is properly set from the products array
+            await this.refreshInventory();
             
-            if (existingIndex !== -1) {
-                const item = this.inventory[existingIndex];
-                item.beginning = beginning;
-                item.stock = stock;
-                item.updatedAt = nowIso;
-                // Ensure productName is set
-                if (product && !item.productName) {
-                    item.productName = product.name;
-                }
-            } else {
-                this.inventory.push({
-                    id: result.id || Utils.generateId(),
-                    productId: productId,
-                    productName: product ? product.name : '',
-                    beginning,
-                    stock,
-                    updatedAt: nowIso
-                });
+            // Find the updated item after refresh
+            const updatedItem = this.inventory.find(i => 
+                i.productId === productId || i.product_id === productId
+            );
+            
+            // Ensure productName is always set (fallback in case normalization missed it)
+            if (updatedItem && product && !updatedItem.productName) {
+                updatedItem.productName = product.name;
             }
             
             // Sync to localStorage
             this.saveData(STORAGE_KEYS.inventory, this.inventory);
-            this.showToast(existingIndex !== -1 ? 'Inventory updated successfully' : 'Inventory record created');
+            this.showToast(updatedItem ? 'Inventory updated successfully' : 'Inventory record created');
             this.renderInventory();
             this.updateDashboard();
             this.closeModal('inventory-modal');
@@ -981,12 +1021,16 @@ class AdminDashboard {
         if (!confirm('Delete this inventory record?')) return;
         
         this.showLoading();
-        this.inventory = this.inventory.filter(i => i.id !== id);
-        
-        if (this.saveData(STORAGE_KEYS.inventory, this.inventory)) {
+        try {
+            await api.deleteInventory(id);
+            this.inventory = this.inventory.filter(i => i.id !== id);
+            this.saveData(STORAGE_KEYS.inventory, this.inventory);
             this.showToast('Inventory record deleted');
             this.renderInventory();
             this.updateDashboard();
+        } catch (error) {
+            console.error('Error deleting inventory:', error);
+            this.showToast(`Failed to delete inventory: ${error.message}`, 'error');
         }
         this.hideLoading();
     }
@@ -1039,9 +1083,15 @@ class AdminDashboard {
                 stockText = 'Medium Stock';
             }
             
+            // Find product name if missing
+            const productName = i.productName || (() => {
+                const prod = this.products.find(p => p.id === i.productId || p.id === i.product_id);
+                return prod ? prod.name : 'Unknown Product';
+            })();
+            
             return `
                 <tr class="${rowClass}">
-                    <td><strong>${i.productName}</strong></td>
+                    <td><strong>${productName}</strong></td>
                     <td>${i.beginning}</td>
                     <td><strong>${i.stock}</strong></td>
                     <td><span class="badge ${stockStatus}">${stockText}</span></td>

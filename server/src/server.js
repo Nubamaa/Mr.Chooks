@@ -90,6 +90,11 @@ app.put('/api/inventory/:productId', (req, res) => {
   }
 });
 
+app.delete('/api/inventory/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM inventory WHERE id = ?').run(req.params.id);
+  ok(res, { changes: info.changes });
+});
+
 // Expenses
 app.get('/api/expenses', (req, res) => {
   const rows = db.prepare('SELECT * FROM expenses ORDER BY date DESC').all();
@@ -169,20 +174,33 @@ app.get('/api/sales', (req, res) => {
   const params = [];
   
   if (startDate && endDate) {
+    // If dates are date-only (YYYY-MM-DD), include the full day
+    const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
+    const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
     query = 'SELECT * FROM sales WHERE date >= ? AND date <= ? ORDER BY date DESC';
-    params.push(startDate, endDate);
+    params.push(start, end);
   } else if (startDate) {
+    const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
     query = 'SELECT * FROM sales WHERE date >= ? ORDER BY date DESC';
-    params.push(startDate);
+    params.push(start);
   } else if (endDate) {
+    const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
     query = 'SELECT * FROM sales WHERE date <= ? ORDER BY date DESC';
-    params.push(endDate);
+    params.push(end);
   }
   
-  const rows = params.length > 0 
+  const sales = params.length > 0 
     ? db.prepare(query).all(...params)
     : db.prepare(query).all();
-  ok(res, rows);
+  
+  // Include items and discounts for each sale
+  const salesWithDetails = sales.map(sale => {
+    const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(sale.id);
+    const discounts = db.prepare('SELECT * FROM discounts WHERE sale_id = ?').all(sale.id);
+    return { ...sale, items, discounts };
+  });
+  
+  ok(res, salesWithDetails);
 });
 
 app.get('/api/sales/:id', (req, res) => {
