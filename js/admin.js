@@ -120,6 +120,19 @@ class AdminDashboard {
         }
     }
 
+    // Refresh inventory data from API
+    async refreshInventory() {
+        try {
+            const inventory = await api.getInventory();
+            this.inventory = DataNormalizer.normalizeInventory(inventory, this.products);
+            // Update localStorage backup
+            this.saveData(STORAGE_KEYS.inventory, this.inventory);
+        } catch (error) {
+            console.error('Error refreshing inventory:', error);
+            // Keep existing inventory data on error
+        }
+    }
+
     // Fallback: Load from localStorage
     loadDataFromLocalStorage() {
         try {
@@ -903,34 +916,23 @@ class AdminDashboard {
         try {
             const result = await api.updateInventory(productId, { beginning, stock });
             
-            // Update local data (normalized format)
-            const existingIndex = this.inventory.findIndex(i => i.productId === productId);
-            const nowIso = new Date().toISOString();
-            const product = this.products.find(p => p.id === productId);
+            // Reload inventory from API to ensure we have fresh data with proper normalization
+            // This ensures productName is properly set from the products array
+            await this.refreshInventory();
             
-            if (existingIndex !== -1) {
-                const item = this.inventory[existingIndex];
-                item.beginning = beginning;
-                item.stock = stock;
-                item.updatedAt = nowIso;
-                // Always ensure productName is set when product exists
-                if (product) {
-                    item.productName = product.name;
-                }
-            } else {
-                this.inventory.push({
-                    id: result.id || Utils.generateId(),
-                    productId: productId,
-                    productName: product ? product.name : '',
-                    beginning,
-                    stock,
-                    updatedAt: nowIso
-                });
+            // Find the updated item after refresh
+            const updatedItem = this.inventory.find(i => 
+                i.productId === productId || i.product_id === productId
+            );
+            
+            // Ensure productName is always set (fallback in case normalization missed it)
+            if (updatedItem && product && !updatedItem.productName) {
+                updatedItem.productName = product.name;
             }
             
             // Sync to localStorage
             this.saveData(STORAGE_KEYS.inventory, this.inventory);
-            this.showToast(existingIndex !== -1 ? 'Inventory updated successfully' : 'Inventory record created');
+            this.showToast(updatedItem ? 'Inventory updated successfully' : 'Inventory record created');
             this.renderInventory();
             this.updateDashboard();
             this.closeModal('inventory-modal');
