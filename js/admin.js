@@ -1680,18 +1680,27 @@ class AdminDashboard {
                         </tr>
                     </thead>
                     <tbody>
-                        ${lowStock.map(i => `
+                        ${lowStock.map(i => {
+                            // Find product name if missing
+                            const productName = i.productName || (() => {
+                                const prod = this.products.find(p => p.id === i.productId || p.id === i.product_id);
+                                return prod ? prod.name : 'Unknown Product';
+                            })();
+                            const productId = i.productId || i.product_id;
+                            
+                            return `
                             <tr class="low-stock">
-                                <td><strong>${i.productName}</strong></td>
+                                <td><strong>${productName}</strong></td>
                                 <td>${i.stock}</td>
                                 <td><span class="badge badge-danger">Low Stock</span></td>
                                 <td>
-                                    <button class="btn btn-primary btn-sm restock-btn" data-product-id="${i.productId}">
+                                    <button class="btn btn-primary btn-sm restock-btn" data-product-id="${productId}">
                                         Restock
                                     </button>
                                 </td>
                             </tr>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
