@@ -18,17 +18,23 @@ class AdminDashboard {
     }
     
     async init() {
-        this.setupEventListeners();
-        this.setDefaultDates();
-        this.setDefaultPeriods();
-        this.initCalendarIntegration();
-        this.setupStorageSync();
-        this.updateUserDisplay();
-        
-        // Load data from API
-        await this.loadDataFromAPI();
-        this.renderAll();
-        this.hideLoading();
+        try {
+            this.setupEventListeners();
+            this.setDefaultDates();
+            this.setDefaultPeriods();
+            this.initCalendarIntegration();
+            this.setupStorageSync();
+            this.updateUserDisplay();
+            
+            // Load data from API (loadDataFromAPI handles its own loading state)
+            await this.loadDataFromAPI();
+            this.renderAll();
+        } catch (error) {
+            console.error('Error initializing admin dashboard:', error);
+            this.showToast('Error initializing dashboard. Please refresh the page.', 'error');
+            // Ensure loading is hidden even on error
+            this.hideLoading();
+        }
     }
     
     updateUserDisplay() {
@@ -95,6 +101,9 @@ class AdminDashboard {
             this.showToast('Failed to load data from server. Using cached data.', 'error');
             // Fallback to localStorage
             this.loadDataFromLocalStorage();
+        } finally {
+            // Always hide loading, even if there's an error
+            this.hideLoading();
         }
     }
 
@@ -513,8 +522,14 @@ class AdminDashboard {
             'products': () => this.renderProducts(),
             'inventory': () => this.renderInventory(),
             'sales': async () => {
-                await this.refreshSales();
-                this.renderSales();
+                try {
+                    await this.refreshSales();
+                    this.renderSales();
+                } catch (error) {
+                    console.error('Error refreshing sales:', error);
+                    // Still render with existing data
+                    this.renderSales();
+                }
             },
             'expenses': () => this.renderExpenses(),
             'purchase-orders': () => this.renderPurchaseOrders(),
@@ -524,7 +539,14 @@ class AdminDashboard {
         };
         
         if (viewHandlers[view]) {
-            viewHandlers[view]();
+            const handler = viewHandlers[view];
+            // Handle async handlers
+            const result = handler();
+            if (result instanceof Promise) {
+                result.catch(error => {
+                    console.error(`Error in view handler for ${view}:`, error);
+                });
+            }
         }
     }
 
