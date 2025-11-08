@@ -90,6 +90,11 @@ app.put('/api/inventory/:productId', (req, res) => {
   }
 });
 
+app.delete('/api/inventory/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM inventory WHERE id = ?').run(req.params.id);
+  ok(res, { changes: info.changes });
+});
+
 // Expenses
 app.get('/api/expenses', (req, res) => {
   const rows = db.prepare('SELECT * FROM expenses ORDER BY date DESC').all();

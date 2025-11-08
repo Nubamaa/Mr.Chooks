@@ -981,12 +981,16 @@ class AdminDashboard {
         if (!confirm('Delete this inventory record?')) return;
         
         this.showLoading();
-        this.inventory = this.inventory.filter(i => i.id !== id);
-        
-        if (this.saveData(STORAGE_KEYS.inventory, this.inventory)) {
+        try {
+            await api.deleteInventory(id);
+            this.inventory = this.inventory.filter(i => i.id !== id);
+            this.saveData(STORAGE_KEYS.inventory, this.inventory);
             this.showToast('Inventory record deleted');
             this.renderInventory();
             this.updateDashboard();
+        } catch (error) {
+            console.error('Error deleting inventory:', error);
+            this.showToast(`Failed to delete inventory: ${error.message}`, 'error');
         }
         this.hideLoading();
     }

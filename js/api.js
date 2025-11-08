@@ -103,6 +103,11 @@ class ApiClient {
         return response.data;
     }
 
+    async deleteInventory(id) {
+        const response = await this.delete(`/api/inventory/${id}`);
+        return response.data;
+    }
+
     // Sales
     async getSales(startDate, endDate) {
         let path = '/api/sales';
