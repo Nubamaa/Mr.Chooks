@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_payment_method ON sales (payment_method);
 CREATE TABLE IF NOT EXISTS sale_items (
   id TEXT PRIMARY KEY,
   sale_id TEXT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-  product_id TEXT NOT NULL REFERENCES products(id),
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   price NUMERIC NOT NULL CHECK (price >= 0),
@@ -122,7 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_po_date ON purchase_orders (date);
 CREATE TABLE IF NOT EXISTS purchase_order_items (
   id TEXT PRIMARY KEY,
   po_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  product_id TEXT NOT NULL REFERENCES products(id),
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   unit_cost NUMERIC NOT NULL CHECK (unit_cost >= 0),
@@ -133,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_poi_po ON purchase_order_items (po_id);
 -- Losses
 CREATE TABLE IF NOT EXISTS losses (
   id TEXT PRIMARY KEY,
-  product_id TEXT NOT NULL REFERENCES products(id),
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   reason TEXT NOT NULL,
@@ -148,7 +148,7 @@ CREATE INDEX IF NOT EXISTS idx_losses_product ON losses (product_id);
 -- Unsold products
 CREATE TABLE IF NOT EXISTS unsold_products (
   id TEXT PRIMARY KEY,
-  product_id TEXT NOT NULL REFERENCES products(id),
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   price NUMERIC NOT NULL CHECK (price > 0),

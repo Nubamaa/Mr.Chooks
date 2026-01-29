@@ -140,6 +140,15 @@ class DataNormalizer {
         return employeeId ? `Employee ${employeeId}` : 'N/A';
     }
 
+    // Normalize unsold products data
+    static normalizeUnsold(unsold) {
+        const normalized = this.toCamelCase(unsold);
+        normalized.productId = normalized.productId || normalized.product_id;
+        normalized.productName = normalized.productName || normalized.product_name;
+        normalized.recordedBy = normalized.recordedBy || normalized.recorded_by;
+        return normalized;
+    }
+
     // Normalize all data types
     static normalize(data, type, products = []) {
         switch (type) {
@@ -181,14 +190,6 @@ class DataNormalizer {
             default:
                 return this.toCamelCase(data);
         }
-    }
-
-    normalizeUnsold(unsold) {
-        return {
-            ...this.toCamelCase(unsold),
-            productName: unsold.product_name || unsold.productName,
-            recordedBy: unsold.recorded_by || unsold.recordedBy
-        };
     }
 }
 

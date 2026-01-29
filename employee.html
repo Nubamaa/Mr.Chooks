@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Mr. Chooks - Employee Kiosk</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/employee.css">
@@ -16,11 +18,14 @@
                 <img src="assets/Mr. Chooks.png" alt="Mr. Chooks Logo" class="brand-logo">
                 <div class="brand-info">
                     <h1>Mr. Chooks</h1>
-                    <p>Employee Kiosk</p>
+                    <p>Employee POS</p>
                 </div>
             </div>
             <div class="header-info">
                 <div class="current-time" id="current-time"></div>
+                <button class="btn btn-secondary btn-sm" id="activity-toggle" style="background: var(--accent-orange); color: white; border: none;">
+                    <i class="fas fa-history"></i> Today's Activity
+                </button>
                 <button class="btn btn-secondary btn-sm" id="logout-btn">
                     <i class="fas fa-sign-out-alt"></i> Logout
                 </button>
@@ -29,7 +34,7 @@
 
         <!-- Main Kiosk Interface -->
         <main class="kiosk-main">
-            <!-- Quick Sales Panel -->
+            <!-- Left Side: Quick Sales Panel with Products -->
             <div class="sales-panel">
                 <h2 class="panel-title">Quick Sales</h2>
                 
@@ -44,41 +49,44 @@
                         <!-- Products will be loaded here -->
                     </div>
                 </div>
+            </div>
 
+            <!-- Right Side: Cart and Activity -->
+            <div class="sales-right">
                 <!-- Cart -->
                 <div class="cart-panel">
-                    <h3 class="cart-title">Current Sale</h3>
+                    <h3 class="cart-title"><i class="fas fa-shopping-cart"></i> Current Sale</h3>
                     <div class="cart-items" id="cart-items">
                         <!-- Cart items will appear here -->
                     </div>
                     
                     <div class="cart-summary">
                         <div class="summary-row">
-                            <span>Subtotal:</span>
-                            <span id="cart-subtotal">₱0.00</span>
+                            <span><strong>Subtotal:</strong></span>
+                            <span id="cart-subtotal" style="font-weight: 700;">₱0.00</span>
                         </div>
                         
                         <!-- Discount Section -->
                         <div class="discount-section">
                             <div class="summary-row">
-                                <span>Discount:</span>
+                                <span><strong>Discount:</strong></span>
                                 <div class="discount-controls">
-                                    <button class="btn btn-sm" id="apply-discount">Apply Discount</button>
-                                    <span id="discount-amount">₱0.00</span>
+                                    <button class="btn btn-sm" id="apply-discount" style="background: var(--accent-orange); color: white; padding: 6px 12px;">Apply</button>
+                                    <span id="discount-amount" style="font-weight: 700; color: var(--danger-dark);">₱0.00</span>
                                 </div>
                             </div>
                             <!-- Discount type badge will appear here -->
                         </div>
                         
                         <div class="summary-row total">
-                            <span>Total:</span>
-                            <span id="cart-total">₱0.00</span>
+                            <span><strong>TOTAL:</strong></span>
+                            <span id="cart-total" style="font-weight: 800;">₱0.00</span>
                         </div>
                     </div>
 
                     <!-- Payment Method -->
                     <div class="payment-methods">
-                        <h4>Payment Method</h4>
+                        <h4><i class="fas fa-credit-card"></i> Payment Method</h4>
                         <div class="method-buttons">
                             <button class="method-btn active" data-method="Cash">
                                 <i class="fas fa-money-bill"></i> Cash
@@ -88,44 +96,20 @@
                             </button>
                         </div>
                         <div class="gcash-reference" id="gcash-reference" style="display: none;">
-                            <label>GCash Reference ID:</label>
+                            <label><i class="fas fa-phone"></i> GCash Reference ID:</label>
                             <input type="text" id="gcash-ref-id" placeholder="Enter reference ID">
                         </div>
                     </div>
 
                     <!-- Action Buttons -->
                     <div class="action-buttons">
-                        <button class="btn btn-secondary" id="clear-cart">
+                        <button class="btn btn-secondary" id="clear-cart" style="background: #e2e8f0; color: var(--text); border: 2px solid var(--border);">
                             <i class="fas fa-trash"></i> Clear
                         </button>
-                        <button class="btn btn-success" id="complete-sale">
-                            <i class="fas fa-check"></i> Complete Sale
+                        <button class="btn btn-success" id="complete-sale" style="background: linear-gradient(135deg, var(--success-dark) 0%, #2f855a 100%); color: white; font-size: 16px; font-weight: 800;">
+                            <i class="fas fa-check-circle"></i> Complete Sale
                         </button>
                     </div>
-                </div>
-            </div>
-
-            <!-- Recent Sales & Unsold Products -->
-            <div class="recent-sales">
-                <h2 class="panel-title">Today's Activity</h2>
-                <div class="activity-tabs">
-                    <button class="tab-btn active" data-tab="sales">Sales</button>
-                    <button class="tab-btn" data-tab="unsold">Unsold Products</button>
-                </div>
-                
-                <div class="tab-content active" id="sales-tab">
-                    <div class="sales-list" id="sales-list">
-                        <!-- Recent sales will appear here -->
-                    </div>
-                </div>
-                
-                <div class="tab-content" id="unsold-tab">
-                    <div class="unsold-products" id="unsold-products">
-                        <!-- Unsold products will appear here -->
-                    </div>
-                    <button class="btn btn-primary btn-block" id="record-unsold">
-                        <i class="fas fa-exclamation-triangle"></i> Record Unsold Products
-                    </button>
                 </div>
             </div>
         </main>
@@ -140,11 +124,6 @@
             </div>
             <div class="modal-body">
                 <div class="discount-buttons">
-                    <button class="discount-option-btn" data-type="whole_chicken">
-                        <i class="fas fa-drumstick-bite"></i>
-                        <span>Whole Chicken</span>
-                        <small>No ID Required</small>
-                    </button>
                     <button class="discount-option-btn" data-type="pwd">
                         <i class="fas fa-wheelchair"></i>
                         <span>PWD</span>
@@ -224,6 +203,64 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" id="new-sale-btn">New Sale</button>
                 <button class="btn btn-secondary" id="print-receipt">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Modal -->
+    <div class="modal" id="activity-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Today's Activity</h3>
+                <button class="modal-close" id="close-activity-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Activity Tabs -->
+                <div class="activity-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+                    <button class="tab-btn active" data-tab="sales" style="padding: 10px 20px; border: none; background: transparent; cursor: pointer; font-weight: 700;">
+                        <i class="fas fa-receipt"></i> Sales
+                    </button>
+                    <button class="tab-btn" data-tab="unsold" style="padding: 10px 20px; border: none; background: transparent; cursor: pointer; font-weight: 700;">
+                        <i class="fas fa-warning"></i> Unsold
+                    </button>
+                </div>
+
+                <!-- Sales Tab Content -->
+                <div class="tab-content active" id="activity-sales-tab" style="max-height: 600px; overflow-y: auto;">
+                    <div class="sales-list" id="activity-sales-list">
+                        <!-- Recent sales will appear here -->
+                    </div>
+                </div>
+
+                <!-- Unsold Tab Content -->
+                <div class="tab-content" id="activity-unsold-tab" style="max-height: 600px; overflow-y: auto;">
+                    <div class="unsold-products" id="activity-unsold-products">
+                        <!-- Unsold products will appear here -->
+                    </div>
+                    <button class="btn btn-primary btn-block" id="activity-record-unsold" style="margin-top: 15px; padding: 14px; font-weight: 700; font-size: 15px; text-transform: uppercase; width: 100%;">
+                        <i class="fas fa-exclamation-triangle"></i> Record Unsold Products
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+
+    <!-- Sale Details Modal -->
+    <div class="modal" id="sale-details-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Sale Details</h3>
+                <button class="modal-close" id="close-sale-details-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="sale-details-content">
+                    <!-- Sale details will appear here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="back-to-activity">Back to Activity</button>
             </div>
         </div>
     </div>

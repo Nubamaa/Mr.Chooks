@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: mrchooks-pos
+    runtime: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+    disk:
+      name: sqlite-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -13,6 +13,9 @@ class AdminDashboard {
         this.deliveries = [];
         this.activityPage = 1;
         this.activityPerPage = 15;
+        this.lastSaleCount = 0;
+        this.autoRefreshInterval = null;
+        this.autoRefreshDelay = 3000; // Refresh every 3 seconds
         
         this.init();
     }
@@ -29,6 +32,9 @@ class AdminDashboard {
             // Load data from API (loadDataFromAPI handles its own loading state)
             await this.loadDataFromAPI();
             this.renderAll();
+            
+            // Start auto-refresh polling
+            this.startAutoRefresh();
         } catch (error) {
             console.error('Error initializing admin dashboard:', error);
             this.showToast('Error initializing dashboard. Please refresh the page.', 'error');
@@ -2116,25 +2122,79 @@ class AdminDashboard {
     convertToCSV(data, fields) {
         if (!data.length) return '';
         
-        const header = fields.join(',');
+        // Create header with proper capitalization
+        const headerLabels = fields.map(field => {
+            // Convert camelCase to Title Case with spaces
+            return field
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/^./, str => str.toUpperCase())
+                .trim();
+        });
+        
+        const header = headerLabels.join(',');
+        
         const rows = data.map(item =>
             fields.map(field => {
-                const value = item[field] !== undefined ? item[field] : '';
+                let value = item[field] !== undefined ? item[field] : '';
+                
+                // Format currency fields
+                if (field.toLowerCase().includes('price') || 
+                    field.toLowerCase().includes('cost') || 
+                    field.toLowerCase().includes('amount') || 
+                    field.toLowerCase().includes('total') ||
+                    field.toLowerCase().includes('profit')) {
+                    if (typeof value === 'number') {
+                        value = `₱${value.toFixed(2)}`;
+                    }
+                }
+                
+                // Format date fields
+                if (field.toLowerCase().includes('date') || field.toLowerCase().includes('updatedat')) {
+                    if (value) {
+                        const date = new Date(value);
+                        value = date.toLocaleDateString('en-PH', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    }
+                }
+                
+                // Escape quotes and wrap in quotes
+                value = String(value).replace(/"/g, '""');
                 return `"${value}"`;
             }).join(',')
         );
         
-        return [header, ...rows].join('\n');
+        // Add metadata header
+        const timestamp = new Date().toLocaleString('en-PH');
+        const metadata = [
+            `"Mr. Chooks - Export Report"`,
+            `"Generated: ${timestamp}"`,
+            `"Total Records: ${data.length}"`,
+            '""', // Empty row for spacing
+        ].join('\n');
+        
+        return metadata + '\n' + [header, ...rows].join('\n');
     }
     
     downloadCSV(csv, filename) {
-        const blob = new Blob([csv], { type: 'text/csv' });
+        // Add UTF-8 BOM for proper encoding in Excel
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = filename;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
+        
+        // Show success message
+        this.showNotification(`${filename} downloaded successfully!`, 'success');
     }
     
     downloadText(text, filename) {
@@ -2145,6 +2205,52 @@ class AdminDashboard {
         a.download = filename;
         a.click();
         window.URL.revokeObjectURL(url);
+    }
+    
+    // Show notification toast
+    showNotification(message, type = 'info') {
+        // Create notification element if it doesn't exist
+        let notification = document.getElementById('admin-notification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'admin-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-weight: 600;
+                display: none;
+                animation: slideIn 0.3s ease-out;
+            `;
+            document.body.appendChild(notification);
+        }
+        
+        // Set colors based on type
+        const colors = {
+            success: { bg: '#c6f6d5', text: '#22543d', border: '#38a169' },
+            error: { bg: '#fed7d7', text: '#742a2a', border: '#e53e3e' },
+            info: { bg: '#bee3f8', text: '#2c5282', border: '#3182ce' },
+            warning: { bg: '#feebc8', text: '#7c2d12', border: '#dd6b20' }
+        };
+        
+        const color = colors[type] || colors.info;
+        notification.style.backgroundColor = color.bg;
+        notification.style.color = color.text;
+        notification.style.border = `2px solid ${color.border}`;
+        notification.textContent = message;
+        notification.style.display = 'block';
+        
+        // Auto hide after 3 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease-out';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 300);
+        }, 3000);
     }
     
     // Render All Views
@@ -2158,6 +2264,61 @@ class AdminDashboard {
         this.updateDashboard();
         this.renderReports();
         this.renderDailyReconciliation();
+    }
+    
+    // Auto-refresh functionality
+    startAutoRefresh() {
+        // Store initial sale count
+        this.lastSaleCount = this.sales.length;
+        
+        // Poll for new sales every 3 seconds
+        this.autoRefreshInterval = setInterval(() => {
+            this.checkForNewSales();
+        }, this.autoRefreshDelay);
+        
+        console.log('Auto-refresh started - checking for new sales every 3 seconds');
+    }
+    
+    stopAutoRefresh() {
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+            this.autoRefreshInterval = null;
+            console.log('Auto-refresh stopped');
+        }
+    }
+    
+    async checkForNewSales() {
+        try {
+            // Only fetch sales data (lightweight)
+            const salesResponse = await api.getSales();
+            const newSales = DataNormalizer.normalize(salesResponse, 'sales');
+            
+            // Check if there are new sales
+            if (newSales.length > this.lastSaleCount) {
+                console.log(`New sales detected! Previous: ${this.lastSaleCount}, Current: ${newSales.length}`);
+                
+                // Update sales and re-render
+                this.sales = newSales;
+                this.lastSaleCount = newSales.length;
+                
+                // Also fetch inventory to update stock counts
+                const inventoryResponse = await api.getInventory();
+                this.inventory = DataNormalizer.normalizeInventory(inventoryResponse, this.products);
+                
+                // Re-render sales, inventory, and dashboard
+                this.renderSales();
+                this.renderInventory();
+                this.updateDashboard();
+                this.renderReports();
+                this.renderDailyReconciliation();
+                
+                // Show notification
+                this.showToast('New sale recorded! Dashboard updated.', 'success');
+            }
+        } catch (error) {
+            console.error('Error checking for new sales:', error);
+            // Silently fail - don't disrupt the user
+        }
     }
 }
 

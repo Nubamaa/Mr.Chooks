@@ -58,17 +58,57 @@ class EmployeeKiosk {
         });
         
         // Unsold products
-        document.getElementById('record-unsold').addEventListener('click', () => {
-            this.openUnsoldModal();
-        });
+        const recordUnsoldBtn = document.getElementById('record-unsold');
+        if (recordUnsoldBtn) {
+            recordUnsoldBtn.addEventListener('click', () => {
+                this.openUnsoldModal();
+            });
+        }
         
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        // Activity modal
+        const activityToggle = document.getElementById('activity-toggle');
+        const activityModal = document.getElementById('activity-modal');
+        const closeActivityModal = document.getElementById('close-activity-modal');
+        
+        if (activityToggle && activityModal) {
+            activityToggle.addEventListener('click', () => {
+                activityModal.style.display = 'flex';
+                this.loadTodaySalesModal();
+                this.loadUnsoldProductsModal();
+            });
+        }
+        
+        if (closeActivityModal && activityModal) {
+            closeActivityModal.addEventListener('click', () => {
+                activityModal.style.display = 'none';
+            });
+        }
+        
+        // Activity modal close on background click
+        if (activityModal) {
+            activityModal.addEventListener('click', (e) => {
+                if (e.target === activityModal) {
+                    activityModal.style.display = 'none';
+                }
+            });
+        }
+        
+        // Activity modal tab switching
+        const activityTabBtns = document.querySelectorAll('#activity-modal .tab-btn');
+        activityTabBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const tab = e.target.dataset.tab;
-                this.switchTab(tab);
+                this.switchActivityModalTab(tab);
             });
         });
+        
+        // Record unsold from activity modal
+        const activityRecordUnsoldBtn = document.getElementById('activity-record-unsold');
+        if (activityRecordUnsoldBtn) {
+            activityRecordUnsoldBtn.addEventListener('click', () => {
+                this.openUnsoldModal();
+            });
+        }
         
         // Cart actions
         document.getElementById('clear-cart').addEventListener('click', () => {
@@ -121,13 +161,9 @@ class EmployeeKiosk {
             this.selectedDiscountType = buttonEl.dataset.type;
             const idField = document.getElementById('discount-id-field');
             const applyBtn = document.getElementById('apply-discount-btn');
-            if (this.selectedDiscountType === 'pwd' || this.selectedDiscountType === 'senior') {
-                idField.style.display = 'block';
-                applyBtn.disabled = true;
-            } else {
-                idField.style.display = 'none';
-                applyBtn.disabled = false;
-            }
+            // All remaining options require ID
+            idField.style.display = 'block';
+            applyBtn.disabled = true;
             document.getElementById('discount-id').value = '';
             document.getElementById('id-usage-info').style.display = 'none';
         };
@@ -251,8 +287,10 @@ class EmployeeKiosk {
     
     updateTime() {
         const now = new Date();
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        const dateStr = now.toLocaleDateString('en-US', options);
         document.getElementById('current-time').textContent = 
-            now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+            dateStr + ' ' + now.toLocaleTimeString();
     }
     
     async loadProducts() {
@@ -263,13 +301,20 @@ class EmployeeKiosk {
                 api.getInventory()
             ]);
             
-            this.products = products.status === 'fulfilled' 
-                ? products.value.filter(p => p.is_active !== 0 && p.is_active !== false)
-                : JSON.parse(localStorage.getItem(STORAGE_KEYS.products) || '[]').filter(p => p.isActive !== false);
+            // Normalize products from API
+            const rawProducts = products.status === 'fulfilled' 
+                ? products.value
+                : JSON.parse(localStorage.getItem(STORAGE_KEYS.products) || '[]');
             
-            this.inventory = inventory.status === 'fulfilled'
+            this.products = DataNormalizer.normalize(rawProducts, 'products')
+                .filter(p => p.isActive !== 0 && p.isActive !== false);
+            
+            // Normalize inventory from API using products for product names
+            const rawInventory = inventory.status === 'fulfilled'
                 ? inventory.value
                 : JSON.parse(localStorage.getItem(STORAGE_KEYS.inventory) || '[]');
+            
+            this.inventory = DataNormalizer.normalizeInventory(rawInventory, this.products);
             
             // Sync to localStorage as backup
             this.saveData(STORAGE_KEYS.products, this.products);
@@ -279,7 +324,8 @@ class EmployeeKiosk {
         } catch (error) {
             console.error('Error loading products:', error);
             // Fallback to localStorage
-            this.products = JSON.parse(localStorage.getItem(STORAGE_KEYS.products) || '[]')
+            const rawProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.products) || '[]');
+            this.products = DataNormalizer.normalize(rawProducts, 'products')
                 .filter(p => p.isActive !== false);
             this.renderProducts(this.products);
         }
@@ -365,6 +411,17 @@ class EmployeeKiosk {
                 cost: product.cost || 0,
                 quantity: 1
             });
+        }
+        
+        // Auto-apply whole chicken discount if product is whole chicken
+        if ((product.name.toLowerCase().includes('whole chicken') || 
+             product.name.toLowerCase().includes('whole')) && !this.currentDiscount) {
+            this.currentDiscount = {
+                type: 'whole_chicken',
+                idNumber: null,
+                amount: 20
+            };
+            this.showToast('₱20 whole chicken discount applied automatically', 'success');
         }
         
         this.renderCart();
@@ -459,13 +516,13 @@ class EmployeeKiosk {
             let discountTypeText = '';
             switch(this.currentDiscount.type) {
                 case 'whole_chicken':
-                    discountTypeText = '🐔 Whole Chicken';
+                    discountTypeText = 'Whole Chicken';
                     break;
                 case 'pwd':
-                    discountTypeText = '♿ PWD';
+                    discountTypeText = 'PWD';
                     break;
                 case 'senior':
-                    discountTypeText = '👵 Senior';
+                    discountTypeText = 'Senior';
                     break;
             }
             
@@ -553,22 +610,9 @@ class EmployeeKiosk {
             return;
         }
         
-        // Check if this is a whole chicken purchase for whole chicken discount
-        if (this.selectedDiscountType === 'whole_chicken') {
-            const hasWholeChicken = this.cart.some(item => 
-                item.name.toLowerCase().includes('whole chicken') || 
-                item.name.toLowerCase().includes('whole')
-            );
-            
-            if (!hasWholeChicken) {
-                this.showToast('Whole chicken discount only applies to whole chicken purchases', 'error');
-                return;
-            }
-        }
-        
         this.currentDiscount = {
             type: this.selectedDiscountType,
-            idNumber: this.selectedDiscountType !== 'whole_chicken' ? idNumber : null,
+            idNumber: idNumber,
             amount
         };
         
@@ -1168,6 +1212,222 @@ class EmployeeKiosk {
                 setTimeout(() => toast.remove(), 300);
             }
         }, 3000);
+    }
+
+    // Slider View Functionality
+    switchActivityModalTab(tabName) {
+        // Remove active class from all tabs and contents in activity modal
+        document.querySelectorAll('#activity-modal .tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelectorAll('#activity-modal .tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+
+        // Add active class to clicked tab
+        document.querySelectorAll(`#activity-modal .tab-btn[data-tab="${tabName}"]`).forEach(btn => {
+            btn.classList.add('active');
+        });
+
+        // Show corresponding content
+        if (tabName === 'sales') {
+            const salesTab = document.getElementById('activity-sales-tab');
+            if (salesTab) {
+                salesTab.classList.add('active');
+            }
+        } else if (tabName === 'unsold') {
+            const unsoldTab = document.getElementById('activity-unsold-tab');
+            if (unsoldTab) {
+                unsoldTab.classList.add('active');
+            }
+        }
+    }
+
+    async loadTodaySalesModal() {
+        const container = document.getElementById('activity-sales-list');
+        if (!container) return;
+        
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const sales = await api.getSales(today, today);
+            const normalizedSales = DataNormalizer.normalize(sales, 'sales');
+            
+            const todaySales = normalizedSales
+                .filter(sale => sale.date && sale.date.startsWith(today))
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 10);
+            
+            if (!todaySales.length) {
+                container.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon"><i class="fas fa-receipt"></i></div>
+                        <div class="empty-text">No sales today</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const transactions = {};
+            todaySales.forEach(sale => {
+                const saleId = sale.saleId || sale.id;
+                if (!transactions[saleId]) {
+                    transactions[saleId] = {
+                        id: saleId,
+                        time: sale.date,
+                        paymentMethod: sale.paymentMethod,
+                        gcashReference: sale.gcashReference,
+                        items: [],
+                        total: 0,
+                        employee: sale.employee || 'N/A'
+                    };
+                }
+                transactions[saleId].items.push(sale);
+                transactions[saleId].total += sale.total || (sale.quantity * sale.price);
+            });
+        
+            // Store transactions for detail view
+            this.currentTransactions = Object.values(transactions);
+
+            container.innerHTML = this.currentTransactions.map((transaction, index) => `
+                <div class="sale-item" data-transaction-index="${index}" style="cursor: pointer;">
+                    <div class="sale-info">
+                        <h4>₱${transaction.total.toFixed(2)}</h4>
+                        <div class="sale-details">
+                            ${new Date(transaction.time).toLocaleTimeString()} • 
+                            ${transaction.paymentMethod}
+                            ${transaction.gcashReference ? ` • Ref: ${transaction.gcashReference}` : ''} •
+                            ${transaction.items.length} item(s)
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers to sale items
+            container.querySelectorAll('.sale-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const index = parseInt(e.currentTarget.dataset.transactionIndex);
+                    this.showSaleDetails(this.currentTransactions[index]);
+                });
+            });
+        } catch (error) {
+            console.error('Error loading sales:', error);
+        }
+    }
+
+    showSaleDetails(transaction) {
+        const detailsContainer = document.getElementById('sale-details-content');
+        const detailsModal = document.getElementById('sale-details-modal');
+        const activityModal = document.getElementById('activity-modal');
+
+        const itemsHtml = transaction.items.map(item => `
+            <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border);">
+                <div>
+                    <div style="font-weight: 700;">${item.productName || item.product_name}</div>
+                    <div style="font-size: 14px; color: var(--text-light);">Qty: ${item.quantity}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 700;">₱${(item.quantity * item.price).toFixed(2)}</div>
+                    <div style="font-size: 12px; color: var(--text-light);">₱${item.price.toFixed(2)} each</div>
+                </div>
+            </div>
+        `).join('');
+
+        detailsContainer.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 28px; font-weight: 800; color: var(--primary); margin-bottom: 10px;">₱${transaction.total.toFixed(2)}</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;"><i class="fas fa-clock"></i> Time</div>
+                        <div style="font-weight: 700; font-size: 16px;">${new Date(transaction.time).toLocaleTimeString()}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;">
+                            ${transaction.paymentMethod === 'GCash' ? '<i class="fas fa-mobile-alt"></i>' : '<i class="fas fa-money-bill"></i>'} 
+                            Payment Method
+                        </div>
+                        <div style="font-weight: 700; font-size: 16px;">${transaction.paymentMethod}</div>
+                    </div>
+                    ${transaction.paymentMethod === 'GCash' && transaction.gcashReference ? `
+                        <div style="grid-column: 1 / -1;">
+                            <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;"><i class="fas fa-link"></i> GCash Reference Number</div>
+                            <div style="font-weight: 700; font-size: 16px; padding: 8px 12px; background: var(--bg-secondary); border-radius: 6px; border-left: 4px solid var(--accent-orange);">${transaction.gcashReference}</div>
+                        </div>
+                    ` : ''}
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;"><i class="fas fa-user"></i> Employee</div>
+                        <div style="font-weight: 700; font-size: 16px;">${transaction.employee}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="border: 2px solid var(--border); border-radius: 8px; overflow: hidden;">
+                <div style="padding: 15px; background: var(--bg-secondary); font-weight: 700; border-bottom: 2px solid var(--border);">
+                    Items (${transaction.items.length})
+                </div>
+                ${itemsHtml}
+            </div>
+        `;
+
+        activityModal.style.display = 'none';
+        detailsModal.style.display = 'flex';
+
+        // Setup back button
+        const backBtn = document.getElementById('back-to-activity');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                detailsModal.style.display = 'none';
+                activityModal.style.display = 'flex';
+            };
+        }
+
+        const closeBtn = document.getElementById('close-sale-details-modal');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                detailsModal.style.display = 'none';
+                activityModal.style.display = 'flex';
+            };
+        }
+    }
+
+    async loadUnsoldProductsModal() {
+        const container = document.getElementById('activity-unsold-products');
+        if (!container) return;
+        
+        try {
+            const unsoldProducts = await api.getUnsold();
+            const normalized = DataNormalizer.normalize(unsoldProducts, 'unsold');
+            const today = new Date().toISOString().split('T')[0];
+            
+            const todayUnsold = normalized.filter(item => 
+                item.date && item.date.startsWith(today)
+            );
+            
+            if (!todayUnsold.length) {
+                container.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="empty-text">No unsold products today</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = todayUnsold.map(item => `
+                <div class="unsold-item">
+                    <div class="unsold-info">
+                        <h4>${item.productName || item.product_name}</h4>
+                        <div class="unsold-details">
+                            Quantity: ${item.quantity} • Price: ₱${item.price.toFixed(2)} • ${this.getReasonText(item.reason)}
+                        </div>
+                    </div>
+                    <div class="unsold-amount">
+                        ₱${(item.quantity * item.price).toFixed(2)}
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading unsold products:', error);
+        }
     }
 }
 
