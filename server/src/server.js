@@ -10,7 +10,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const db = getDb();
+let db = null;
+
+// Initialize database and store reference
+getDb().then(database => {
+  db = database;
+  console.log('✓ Database initialized');
+}).catch(err => {
+  console.error('✗ Failed to initialize database:', err.message);
+  process.exit(1);
+});
 
 app.use(cors());
 app.use(express.json());
@@ -23,10 +32,9 @@ function ok(res, data) { return res.json({ ok: true, data }); }
 function bad(res, message, status = 400) { return res.status(status).json({ ok: false, message }); }
 
 // Health
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
-    // Test database connection
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+    const tables = await db.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
     ok(res, { 
       status: 'ok', 
       database: 'connected',
@@ -39,186 +47,262 @@ app.get('/api/health', (req, res) => {
 });
 
 // Products
-app.get('/api/products', (req, res) => {
-  const rows = db.prepare('SELECT * FROM products ORDER BY name').all();
-  ok(res, rows);
+app.get('/api/products', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM products ORDER BY name');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
-app.post('/api/products', (req, res) => {
+app.post('/api/products', async (req, res) => {
   const { name, price, cost, description = '', is_active = 1 } = req.body || {};
   if (!name || price == null || cost == null) return bad(res, 'Missing fields');
   const id = nanoid();
   try {
-    db.prepare('INSERT INTO products (id, name, price, cost, description, is_active) VALUES (?,?,?,?,?,?)')
-      .run(id, name, price, cost, description, is_active ? 1 : 0);
+    await db.run('INSERT INTO products (id, name, price, cost, description, is_active) VALUES (?,?,?,?,?,?)',
+      [id, name, price, cost, description, is_active ? 1 : 0]);
     ok(res, { id });
   } catch (e) {
     bad(res, e.message);
   }
 });
 
-app.put('/api/products/:id', (req, res) => {
+app.put('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   const { name, price, cost, description, is_active } = req.body || {};
-  const stmt = db.prepare('UPDATE products SET name = COALESCE(?, name), price = COALESCE(?, price), cost = COALESCE(?, cost), description = COALESCE(?, description), is_active = COALESCE(?, is_active), updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-  const info = stmt.run(name, price, cost, description, is_active == null ? undefined : (is_active ? 1 : 0), id);
-  ok(res, { changes: info.changes });
-});
-
-app.delete('/api/products/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
-  ok(res, { changes: info.changes });
-});
-
-// Inventory
-app.get('/api/inventory', (req, res) => {
-  const rows = db.prepare('SELECT * FROM inventory').all();
-  ok(res, rows);
-});
-
-app.put('/api/inventory/:productId', (req, res) => {
-  const { productId } = req.params;
-  const { beginning = 0, stock = 0 } = req.body || {};
-  const existing = db.prepare('SELECT id FROM inventory WHERE product_id = ?').get(productId);
-  if (existing) {
-    const info = db.prepare('UPDATE inventory SET beginning=?, stock=?, updated_at=CURRENT_TIMESTAMP WHERE product_id=?').run(beginning, stock, productId);
-    ok(res, { changes: info.changes });
-  } else {
-    const id = nanoid();
-    db.prepare('INSERT INTO inventory (id, product_id, beginning, stock) VALUES (?,?,?,?)').run(id, productId, beginning, stock);
-    ok(res, { id });
+  try {
+    await db.run('UPDATE products SET name = COALESCE(?, name), price = COALESCE(?, price), cost = COALESCE(?, cost), description = COALESCE(?, description), is_active = COALESCE(?, is_active), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [name, price, cost, description, is_active == null ? undefined : (is_active ? 1 : 0), id]);
+    ok(res, { success: true });
+  } catch (e) {
+    bad(res, e.message);
   }
 });
 
-app.delete('/api/inventory/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM inventory WHERE id = ?').run(req.params.id);
-  ok(res, { changes: info.changes });
+app.delete('/api/products/:id', async (req, res) => {
+  try {
+    await db.run('DELETE FROM products WHERE id = ?', [req.params.id]);
+    ok(res, { success: true });
+  } catch (e) {
+    bad(res, e.message);
+  }
+});
+
+// Inventory
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM inventory');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
+});
+
+app.put('/api/inventory/:productId', async (req, res) => {
+  const { productId } = req.params;
+  const { beginning = 0, stock = 0 } = req.body || {};
+  try {
+    const existing = await db.get('SELECT id FROM inventory WHERE product_id = ?', [productId]);
+    if (existing) {
+      await db.run('UPDATE inventory SET beginning=?, stock=?, updated_at=CURRENT_TIMESTAMP WHERE product_id=?',
+        [beginning, stock, productId]);
+      ok(res, { success: true });
+    } else {
+      const id = nanoid();
+      await db.run('INSERT INTO inventory (id, product_id, beginning, stock) VALUES (?,?,?,?)',
+        [id, productId, beginning, stock]);
+      ok(res, { id });
+    }
+  } catch (e) {
+    bad(res, e.message);
+  }
+});
+
+app.delete('/api/inventory/:id', async (req, res) => {
+  try {
+    await db.run('DELETE FROM inventory WHERE id = ?', [req.params.id]);
+    ok(res, { success: true });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
 // Expenses
-app.get('/api/expenses', (req, res) => {
-  const rows = db.prepare('SELECT * FROM expenses ORDER BY date DESC').all();
-  ok(res, rows);
+app.get('/api/expenses', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM expenses ORDER BY date DESC');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
-app.post('/api/expenses', (req, res) => {
+
+app.post('/api/expenses', async (req, res) => {
   const { date = new Date().toISOString(), category, description, amount, remarks = '' } = req.body || {};
   if (!category || !description || amount == null) return bad(res, 'Missing fields');
   const id = nanoid();
-  db.prepare('INSERT INTO expenses (id, date, category, description, amount, remarks) VALUES (?,?,?,?,?,?)')
-    .run(id, date, category, description, amount, remarks);
-  ok(res, { id });
+  try {
+    await db.run('INSERT INTO expenses (id, date, category, description, amount, remarks) VALUES (?,?,?,?,?,?)',
+      [id, date, category, description, amount, remarks]);
+    ok(res, { id });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
-app.delete('/api/expenses/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM expenses WHERE id = ?').run(req.params.id);
-  ok(res, { changes: info.changes });
+app.delete('/api/expenses/:id', async (req, res) => {
+  try {
+    await db.run('DELETE FROM expenses WHERE id = ?', [req.params.id]);
+    ok(res, { success: true });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
 // Deliveries
-app.get('/api/deliveries', (req, res) => {
-  const rows = db.prepare('SELECT * FROM deliveries ORDER BY date DESC').all();
-  ok(res, rows);
+app.get('/api/deliveries', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM deliveries ORDER BY date DESC');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
-app.post('/api/deliveries', (req, res) => {
+
+app.post('/api/deliveries', async (req, res) => {
   const { date = new Date().toISOString(), description, amount, driver, remarks = '' } = req.body || {};
   if (!description || amount == null || !driver) return bad(res, 'Missing fields');
   const id = nanoid();
-  db.prepare('INSERT INTO deliveries (id, date, description, amount, driver, remarks) VALUES (?,?,?,?,?,?)')
-    .run(id, date, description, amount, driver, remarks);
-  ok(res, { id });
+  try {
+    await db.run('INSERT INTO deliveries (id, date, description, amount, driver, remarks) VALUES (?,?,?,?,?,?)',
+      [id, date, description, amount, driver, remarks]);
+    ok(res, { id });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
-app.delete('/api/deliveries/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM deliveries WHERE id = ?').run(req.params.id);
-  ok(res, { changes: info.changes });
+app.delete('/api/deliveries/:id', async (req, res) => {
+  try {
+    await db.run('DELETE FROM deliveries WHERE id = ?', [req.params.id]);
+    ok(res, { success: true });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
 // Losses
-app.get('/api/losses', (req, res) => {
-  const rows = db.prepare('SELECT * FROM losses ORDER BY date DESC').all();
-  ok(res, rows);
+app.get('/api/losses', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM losses ORDER BY date DESC');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
-app.post('/api/losses', (req, res) => {
+
+app.post('/api/losses', async (req, res) => {
   const { product_id, product_name, quantity, reason, remarks = '', cost, date = new Date().toISOString() } = req.body || {};
   if (!product_id || !product_name || !quantity || cost == null || !reason) return bad(res, 'Missing fields');
-  withTx(db, () => {
-    const id = nanoid();
-    db.prepare('INSERT INTO losses (id, product_id, product_name, quantity, reason, remarks, cost, date) VALUES (?,?,?,?,?,?,?,?)')
-      .run(id, product_id, product_name, quantity, reason, remarks, cost, date);
-    const inv = db.prepare('SELECT stock FROM inventory WHERE product_id=?').get(product_id);
-    if (inv) {
-      db.prepare('UPDATE inventory SET stock = MAX(0, stock - ?), updated_at=CURRENT_TIMESTAMP WHERE product_id=?').run(quantity, product_id);
-    }
-  });
-  ok(res, { ok: true });
+  try {
+    await withTx(db, async () => {
+      const id = nanoid();
+      await db.run('INSERT INTO losses (id, product_id, product_name, quantity, reason, remarks, cost, date) VALUES (?,?,?,?,?,?,?,?)',
+        [id, product_id, product_name, quantity, reason, remarks, cost, date]);
+      const inv = await db.get('SELECT stock FROM inventory WHERE product_id=?', [product_id]);
+      if (inv) {
+        await db.run('UPDATE inventory SET stock = MAX(0, stock - ?), updated_at=CURRENT_TIMESTAMP WHERE product_id=?',
+          [quantity, product_id]);
+      }
+    });
+    ok(res, { ok: true });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
 // Unsold
-app.get('/api/unsold', (req, res) => {
-  const rows = db.prepare('SELECT * FROM unsold_products ORDER BY date DESC').all();
-  ok(res, rows);
+app.get('/api/unsold', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM unsold_products ORDER BY date DESC');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
-app.post('/api/unsold', (req, res) => {
+
+app.post('/api/unsold', async (req, res) => {
   const { product_id, product_name, quantity, price, reason, recorded_by = '', date = new Date().toISOString() } = req.body || {};
   if (!product_id || !product_name || !quantity || !price || !reason) return bad(res, 'Missing fields');
   const id = nanoid();
-  db.prepare('INSERT INTO unsold_products (id, product_id, product_name, quantity, price, reason, date, recorded_by) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, product_id, product_name, quantity, price, reason, date, recorded_by);
-  ok(res, { id });
+  try {
+    await db.run('INSERT INTO unsold_products (id, product_id, product_name, quantity, price, reason, date, recorded_by) VALUES (?,?,?,?,?,?,?,?)',
+      [id, product_id, product_name, quantity, price, reason, date, recorded_by]);
+    ok(res, { id });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
 // Sales
-app.get('/api/sales', (req, res) => {
+app.get('/api/sales', async (req, res) => {
   const { startDate, endDate } = req.query;
   let query = 'SELECT * FROM sales ORDER BY date DESC';
   const params = [];
   
-  if (startDate && endDate) {
-    // If dates are date-only (YYYY-MM-DD), include the full day
-    const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
-    const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
-    query = 'SELECT * FROM sales WHERE date >= ? AND date <= ? ORDER BY date DESC';
-    params.push(start, end);
-  } else if (startDate) {
-    const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
-    query = 'SELECT * FROM sales WHERE date >= ? ORDER BY date DESC';
-    params.push(start);
-  } else if (endDate) {
-    const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
-    query = 'SELECT * FROM sales WHERE date <= ? ORDER BY date DESC';
-    params.push(end);
+  try {
+    if (startDate && endDate) {
+      const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
+      const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
+      query = 'SELECT * FROM sales WHERE date >= ? AND date <= ? ORDER BY date DESC';
+      params.push(start, end);
+    } else if (startDate) {
+      const start = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`;
+      query = 'SELECT * FROM sales WHERE date >= ? ORDER BY date DESC';
+      params.push(start);
+    } else if (endDate) {
+      const end = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`;
+      query = 'SELECT * FROM sales WHERE date <= ? ORDER BY date DESC';
+      params.push(end);
+    }
+    
+    const sales = await db.all(query, params);
+    
+    // Include items and discounts for each sale
+    const salesWithDetails = await Promise.all(sales.map(async sale => {
+      const items = await db.all('SELECT * FROM sale_items WHERE sale_id = ?', [sale.id]);
+      const discounts = await db.all('SELECT * FROM discounts WHERE sale_id = ?', [sale.id]);
+      return { ...sale, items, discounts };
+    }));
+    
+    ok(res, salesWithDetails);
+  } catch (e) {
+    bad(res, e.message);
   }
-  
-  const sales = params.length > 0 
-    ? db.prepare(query).all(...params)
-    : db.prepare(query).all();
-  
-  // Include items and discounts for each sale
-  const salesWithDetails = sales.map(sale => {
-    const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(sale.id);
-    const discounts = db.prepare('SELECT * FROM discounts WHERE sale_id = ?').all(sale.id);
-    return { ...sale, items, discounts };
-  });
-  
-  ok(res, salesWithDetails);
 });
 
-app.get('/api/sales/:id', (req, res) => {
+app.get('/api/sales/:id', async (req, res) => {
   const { id } = req.params;
-  const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(id);
-  if (!sale) return bad(res, 'Sale not found', 404);
-  
-  const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(id);
-  const discounts = db.prepare('SELECT * FROM discounts WHERE sale_id = ?').all(id);
-  
-  ok(res, { ...sale, items, discounts });
+  try {
+    const sale = await db.get('SELECT * FROM sales WHERE id = ?', [id]);
+    if (!sale) return bad(res, 'Sale not found', 404);
+    
+    const items = await db.all('SELECT * FROM sale_items WHERE sale_id = ?', [id]);
+    const discounts = await db.all('SELECT * FROM discounts WHERE sale_id = ?', [id]);
+    
+    ok(res, { ...sale, items, discounts });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
-app.post('/api/sales', (req, res) => {
+app.post('/api/sales', async (req, res) => {
   const { employee_id = null, payment_method, gcash_reference = null, items = [], discount = null, date = new Date().toISOString() } = req.body || {};
   if (!payment_method || !Array.isArray(items) || items.length === 0) return bad(res, 'Missing fields');
   try {
-    const result = withTx(db, () => {
+    const result = await withTx(db, async () => {
       const saleId = nanoid();
       let subtotal = 0;
       for (const it of items) {
@@ -226,22 +310,23 @@ app.post('/api/sales', (req, res) => {
       }
       const discount_total = discount?.amount ? Number(discount.amount) : 0;
       const total = Math.max(0, subtotal - discount_total);
-      db.prepare('INSERT INTO sales (id, employee_id, payment_method, gcash_reference, date, subtotal, discount_total, total) VALUES (?,?,?,?,?,?,?,?)')
-        .run(saleId, employee_id, payment_method, gcash_reference, date, subtotal, discount_total, total);
-      const insertItem = db.prepare('INSERT INTO sale_items (id, sale_id, product_id, product_name, quantity, price, cost, discount, total) VALUES (?,?,?,?,?,?,?,?,?)');
+      await db.run('INSERT INTO sales (id, employee_id, payment_method, gcash_reference, date, subtotal, discount_total, total) VALUES (?,?,?,?,?,?,?,?)',
+        [saleId, employee_id, payment_method, gcash_reference, date, subtotal, discount_total, total]);
+      
       for (const it of items) {
         const id = nanoid();
         const lineDiscount = discount_total * ((it.quantity * it.price) / subtotal);
         const lineTotal = it.quantity * it.price;
-        insertItem.run(id, saleId, it.product_id, it.product_name, it.quantity, it.price, it.cost ?? 0, lineDiscount, lineTotal);
+        await db.run('INSERT INTO sale_items (id, sale_id, product_id, product_name, quantity, price, cost, discount, total) VALUES (?,?,?,?,?,?,?,?,?)',
+          [id, saleId, it.product_id, it.product_name, it.quantity, it.price, it.cost ?? 0, lineDiscount, lineTotal]);
         // decrement inventory
-        db.prepare('UPDATE inventory SET stock = stock - ?, updated_at=CURRENT_TIMESTAMP WHERE product_id=?')
-          .run(it.quantity, it.product_id);
+        await db.run('UPDATE inventory SET stock = stock - ?, updated_at=CURRENT_TIMESTAMP WHERE product_id=?',
+          [it.quantity, it.product_id]);
       }
       if (discount && discount.amount > 0) {
         const did = nanoid();
-        db.prepare('INSERT INTO discounts (id, sale_id, type, id_number, amount, date, employee_name) VALUES (?,?,?,?,?,?,?)')
-          .run(did, saleId, discount.type, discount.id_number ?? null, discount.amount, date, discount.employee_name ?? null);
+        await db.run('INSERT INTO discounts (id, sale_id, type, id_number, amount, date, employee_name) VALUES (?,?,?,?,?,?,?)',
+          [did, saleId, discount.type, discount.id_number ?? null, discount.amount, date, discount.employee_name ?? null]);
       }
       return { saleId, subtotal, discount_total, total };
     });
@@ -252,35 +337,43 @@ app.post('/api/sales', (req, res) => {
 });
 
 // Purchase Orders
-app.get('/api/purchase-orders', (req, res) => {
-  const rows = db.prepare('SELECT * FROM purchase_orders ORDER BY date DESC').all();
-  ok(res, rows);
+app.get('/api/purchase-orders', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM purchase_orders ORDER BY date DESC');
+    ok(res, rows);
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
-app.get('/api/purchase-orders/:id', (req, res) => {
+app.get('/api/purchase-orders/:id', async (req, res) => {
   const { id } = req.params;
-  const po = db.prepare('SELECT * FROM purchase_orders WHERE id = ?').get(id);
-  if (!po) return bad(res, 'Purchase order not found', 404);
-  
-  const items = db.prepare('SELECT * FROM purchase_order_items WHERE po_id = ?').all(id);
-  ok(res, { ...po, items });
+  try {
+    const po = await db.get('SELECT * FROM purchase_orders WHERE id = ?', [id]);
+    if (!po) return bad(res, 'Purchase order not found', 404);
+    
+    const items = await db.all('SELECT * FROM purchase_order_items WHERE po_id = ?', [id]);
+    ok(res, { ...po, items });
+  } catch (e) {
+    bad(res, e.message);
+  }
 });
 
-app.post('/api/purchase-orders', (req, res) => {
+app.post('/api/purchase-orders', async (req, res) => {
   const { po_number, supplier, status = 'Pending', date = new Date().toISOString(), total = 0, items = [] } = req.body || {};
   if (!po_number || !supplier) return bad(res, 'Missing fields: po_number and supplier required');
   
   try {
-    const result = withTx(db, () => {
+    const result = await withTx(db, async () => {
       const id = nanoid();
-      db.prepare('INSERT INTO purchase_orders (id, po_number, supplier, status, date, total) VALUES (?,?,?,?,?,?)')
-        .run(id, po_number, supplier, status, date, total);
+      await db.run('INSERT INTO purchase_orders (id, po_number, supplier, status, date, total) VALUES (?,?,?,?,?,?)',
+        [id, po_number, supplier, status, date, total]);
       
       if (items && items.length > 0) {
-        const insertItem = db.prepare('INSERT INTO purchase_order_items (id, po_id, product_id, product_name, quantity, unit_cost, total) VALUES (?,?,?,?,?,?,?)');
         for (const it of items) {
           const itemId = nanoid();
-          insertItem.run(itemId, id, it.product_id, it.product_name, it.quantity, it.unit_cost, it.total);
+          await db.run('INSERT INTO purchase_order_items (id, po_id, product_id, product_name, quantity, unit_cost, total) VALUES (?,?,?,?,?,?,?)',
+            [itemId, id, it.product_id, it.product_name, it.quantity, it.unit_cost, it.total]);
         }
       }
       
@@ -292,24 +385,24 @@ app.post('/api/purchase-orders', (req, res) => {
   }
 });
 
-app.put('/api/purchase-orders/:id', (req, res) => {
+app.put('/api/purchase-orders/:id', async (req, res) => {
   const { id } = req.params;
   const { po_number, supplier, status, date, total, items } = req.body || {};
   
   try {
-    withTx(db, () => {
+    await withTx(db, async () => {
       if (po_number || supplier || status || date || total != null) {
-        const stmt = db.prepare('UPDATE purchase_orders SET po_number = COALESCE(?, po_number), supplier = COALESCE(?, supplier), status = COALESCE(?, status), date = COALESCE(?, date), total = COALESCE(?, total) WHERE id = ?');
-        stmt.run(po_number, supplier, status, date, total, id);
+        await db.run('UPDATE purchase_orders SET po_number = COALESCE(?, po_number), supplier = COALESCE(?, supplier), status = COALESCE(?, status), date = COALESCE(?, date), total = COALESCE(?, total) WHERE id = ?',
+          [po_number, supplier, status, date, total, id]);
       }
       
       if (items && Array.isArray(items)) {
         // Delete existing items and insert new ones
-        db.prepare('DELETE FROM purchase_order_items WHERE po_id = ?').run(id);
-        const insertItem = db.prepare('INSERT INTO purchase_order_items (id, po_id, product_id, product_name, quantity, unit_cost, total) VALUES (?,?,?,?,?,?,?)');
+        await db.run('DELETE FROM purchase_order_items WHERE po_id = ?', [id]);
         for (const it of items) {
           const itemId = nanoid();
-          insertItem.run(itemId, id, it.product_id, it.product_name, it.quantity, it.unit_cost, it.total);
+          await db.run('INSERT INTO purchase_order_items (id, po_id, product_id, product_name, quantity, unit_cost, total) VALUES (?,?,?,?,?,?,?)',
+            [itemId, id, it.product_id, it.product_name, it.quantity, it.unit_cost, it.total]);
         }
       }
     });
@@ -319,53 +412,69 @@ app.put('/api/purchase-orders/:id', (req, res) => {
   }
 });
 
-app.delete('/api/purchase-orders/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM purchase_orders WHERE id = ?').run(req.params.id);
-  ok(res, { changes: info.changes });
-});
-
-// Settings
-app.get('/api/settings', (req, res) => {
-  const rows = db.prepare('SELECT * FROM settings').all();
-  const settings = {};
-  rows.forEach(row => {
-    try {
-      settings[row.key] = JSON.parse(row.value);
-    } catch (e) {
-      settings[row.key] = row.value;
-    }
-  });
-  ok(res, settings);
-});
-
-app.get('/api/settings/:key', (req, res) => {
-  const { key } = req.params;
-  const row = db.prepare('SELECT * FROM settings WHERE key = ?').get(key);
-  if (!row) return bad(res, 'Setting not found', 404);
-  
+app.delete('/api/purchase-orders/:id', async (req, res) => {
   try {
-    const value = JSON.parse(row.value);
-    ok(res, { key: row.key, value, updated_at: row.updated_at });
+    await db.run('DELETE FROM purchase_orders WHERE id = ?', [req.params.id]);
+    ok(res, { success: true });
   } catch (e) {
-    ok(res, { key: row.key, value: row.value, updated_at: row.updated_at });
+    bad(res, e.message);
   }
 });
 
-app.put('/api/settings/:key', (req, res) => {
+// Settings
+app.get('/api/settings', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM settings');
+    const settings = {};
+    rows.forEach(row => {
+      try {
+        settings[row.key] = JSON.parse(row.value);
+      } catch (e) {
+        settings[row.key] = row.value;
+      }
+    });
+    ok(res, settings);
+  } catch (e) {
+    bad(res, e.message);
+  }
+});
+
+app.get('/api/settings/:key', async (req, res) => {
+  const { key } = req.params;
+  try {
+    const row = await db.get('SELECT * FROM settings WHERE key = ?', [key]);
+    if (!row) return bad(res, 'Setting not found', 404);
+    
+    try {
+      const value = JSON.parse(row.value);
+      ok(res, { key: row.key, value, updated_at: row.updated_at });
+    } catch (e) {
+      ok(res, { key: row.key, value: row.value, updated_at: row.updated_at });
+    }
+  } catch (e) {
+    bad(res, e.message);
+  }
+});
+
+app.put('/api/settings/:key', async (req, res) => {
   const { key } = req.params;
   const { value } = req.body || {};
   if (value == null) return bad(res, 'Missing value');
   
-  const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
-  const existing = db.prepare('SELECT key FROM settings WHERE key = ?').get(key);
-  
-  if (existing) {
-    db.prepare('UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?').run(valueStr, key);
-  } else {
-    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(key, valueStr);
+  try {
+    const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+    const existing = await db.get('SELECT key FROM settings WHERE key = ?', [key]);
+    
+    if (existing) {
+      await db.run('UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?', [valueStr, key]);
+    } else {
+      await db.run('INSERT INTO settings (key, value) VALUES (?, ?)', [key, valueStr]);
+    }
+    
+    ok(res, { success: true });
+  } catch (e) {
+    bad(res, e.message);
   }
-  
-  ok(res, { success: true });
 });
 
 // Serve static files (CSS, JS, assets) - must come after API routes
